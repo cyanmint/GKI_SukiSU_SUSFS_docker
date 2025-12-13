@@ -24,7 +24,7 @@ on:
           You can also specify a sub_level: a14-6.1.124 (builds only that version)
         required: true
         type: string
-        default: 'a14-6.1'
+        default: 'a14-6.1.124'
       selected_sub_level:
         description: |
           (Optional) Build only a specific sub_level version for the selected kernel.
