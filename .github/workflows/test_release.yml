@@ -24,7 +24,7 @@ on:
           You can also specify a sub_level: a14-6.1.124 (builds only that version)
         required: true
         type: string
-        default: 'all'
+        default: 'a14-6.1'
       selected_sub_level:
         description: |
           (Optional) Build only a specific sub_level version for the selected kernel.
@@ -32,7 +32,7 @@ on:
           Leave empty to build all configured versions for the selected kernel(s).
         required: false
         type: string
-        default: ''
+        default: '124'
       kernelsu_variant:
         description: "Select KernelSU"
         required: true
@@ -51,7 +51,7 @@ on:
         - Stable(标准)
         - Dev(开发)
         - Other(其他/指定)
-        default: Stable(标准)
+        default: Dev(开发)
       version:
         description: 'Custom version name (e.g., characters after 5.10.198 / leave blank to use default version number)'
         required: false
