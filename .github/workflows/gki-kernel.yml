@@ -54,6 +54,7 @@ on:
         type: boolean
         default: false
       docker_support:
+        description: 'Enable Docker support in kernel?'
         required: true
         type: boolean
         default: false
