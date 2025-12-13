@@ -57,7 +57,7 @@ on:
         description: 'Enable Docker support in kernel?'
         required: true
         type: boolean
-        default: false
+        default: true
       selected_sub_level:
         description: 'Build only a specific sub_level (leave empty for all)'
         required: false
