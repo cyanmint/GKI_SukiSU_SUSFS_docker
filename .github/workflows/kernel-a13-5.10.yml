@@ -37,6 +37,11 @@ on:
         required: true
         type: boolean
         default: false
+      docker_support:
+        description: 'Enable Docker support in kernel?'
+        required: true
+        type: boolean
+        default: false
   
 jobs:
   build-kernel-a13-5-10-kernelsu-susfs:
@@ -79,3 +84,4 @@ jobs:
       use_kpm: ${{ inputs.use_kpm }}
       supp_op: ${{ inputs.supp_op || false }}
       BBG: ${{ inputs.BBG || false }}
+      docker_support: ${{ inputs.docker_support || false }}

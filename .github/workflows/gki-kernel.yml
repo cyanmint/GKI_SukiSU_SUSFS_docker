@@ -53,6 +53,10 @@ on:
         required: true
         type: boolean
         default: false
+      docker_support:
+        required: true
+        type: boolean
+        default: false
 jobs:
   build-kernel-kernelsu-susfs:
     runs-on: ubuntu-latest
@@ -538,6 +542,25 @@ jobs:
           
           # Remove check_defconfig
           sed -i 's/check_defconfig//' ./common/build.config.gki
+
+      - name: 添加 Docker 支持配置
+        if: ${{ inputs.docker_support }}
+        run: |
+          echo "更改为配置目录: $CONFIG..."
+          cd "$CONFIG"
+          echo "Adding Docker support configuration settings to gki_defconfig..."
+          
+          CONFIG_FILE="./common/arch/arm64/configs/gki_defconfig"
+          
+          # Add Docker required configurations
+          echo "CONFIG_IPC_NS=y" >> "$CONFIG_FILE"
+          echo "CONFIG_CGROUP_DEVICE=y" >> "$CONFIG_FILE"
+          echo "CONFIG_BRIDGE_NETFILTER=y" >> "$CONFIG_FILE"
+          echo "CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y" >> "$CONFIG_FILE"
+          echo "CONFIG_NETFILTER_XT_MATCH_IPVS=y" >> "$CONFIG_FILE"
+          echo "CONFIG_POSIX_MQUEUE=y" >> "$CONFIG_FILE"
+          
+          echo "Docker support configuration added successfully"
 
       - name: 配置内核名称
         run: |
