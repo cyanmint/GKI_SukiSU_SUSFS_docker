@@ -669,9 +669,27 @@ jobs:
           # Find and remove circular symlinks in KernelSU directory
           if [ -d "common/drivers/kernelsu" ]; then
             echo "检查 KernelSU 目录中的符号链接..."
-            # Remove any kernel/kernel symlink loops
-            find common/drivers/kernelsu -type l -name "kernel" -exec rm -f {} \; 2>/dev/null || true
-            echo "已清理符号链接"
+            
+            # Remove the problematic kernel subdirectory if it exists and has symlinks
+            if [ -d "common/drivers/kernelsu/kernel" ]; then
+              echo "发现 kernelsu/kernel 目录，检查是否有循环引用..."
+              # Check if kernel directory contains itself as a subdirectory (symlink loop indicator)
+              if [ -d "common/drivers/kernelsu/kernel/kernel" ] || [ -L "common/drivers/kernelsu/kernel/kernel" ]; then
+                echo "检测到循环引用，移除整个 kernel 子目录..."
+                rm -rf common/drivers/kernelsu/kernel
+                echo "已移除 kernelsu/kernel 目录"
+              fi
+            fi
+            
+            # Also clean up any remaining circular symlinks
+            find common/drivers/kernelsu -type l 2>/dev/null | while read link; do
+              if ! readlink -e "$link" >/dev/null 2>&1; then
+                echo "移除无效符号链接: $link"
+                rm -f "$link"
+              fi
+            done
+            
+            echo "符号链接清理完成"
           fi
 
       - name: Build with retry
