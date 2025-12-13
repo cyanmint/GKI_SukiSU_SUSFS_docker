@@ -462,6 +462,18 @@ jobs:
             patch -p1 -F 3 < 69_hide_stuff.patch
           fi
 
+      - name: 应用cgroup设备修复补丁 (android14-6.1)
+        if: ${{ inputs.android_version == 'android14' && inputs.kernel_version == '6.1' && inputs.docker_support }}
+        run: |
+          echo "应用cgroup fix patch for android14-6.1..."
+          cd "$CONFIG/common"
+          
+          # Apply cgroup fix patch to prevent bootloop when CONFIG_CGROUP_DEVICE is enabled
+          cp ../../patches/android14-6.1/cgroup_fix_cgroup_prefix.patch ./
+          patch -p1 < cgroup_fix_cgroup_prefix.patch || true
+          
+          echo "cgroup fix patch applied successfully"
+
       - name: LZ4KD & Lz4k_oplus配置
         if: ${{ inputs.use_zram }}
         run: |
@@ -590,7 +602,12 @@ jobs:
           echo "CONFIG_PID_NS=y" >> "$CONFIG_FILE"
           echo "CONFIG_IPC_NS=y" >> "$CONFIG_FILE"
           echo "CONFIG_USER_NS=y" >> "$CONFIG_FILE"
-          #echo "CONFIG_CGROUP_DEVICE=y" >> "$CONFIG_FILE"
+          
+          # Enable CGROUP_DEVICE only for android14-6.1 (with patch applied)
+          if [ "${{ inputs.android_version }}" = "android14" ] && [ "${{ inputs.kernel_version }}" = "6.1" ]; then
+            echo "CONFIG_CGROUP_DEVICE=y" >> "$CONFIG_FILE"
+          fi
+          
           echo "CONFIG_POSIX_MQUEUE=y" >> "$CONFIG_FILE" 
           echo "CONFIG_BRIDGE_NETFILTER=y" >> "$CONFIG_FILE"
           echo "CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y" >> "$CONFIG_FILE"
