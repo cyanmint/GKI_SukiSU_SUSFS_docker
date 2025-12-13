@@ -609,9 +609,9 @@ jobs:
           fi
           
           echo "CONFIG_POSIX_MQUEUE=y" >> "$CONFIG_FILE" 
-          echo "CONFIG_BRIDGE_NETFILTER=y" >> "$CONFIG_FILE"
-          echo "CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y" >> "$CONFIG_FILE"
-          echo "CONFIG_NETFILTER_XT_MATCH_IPVS=y" >> "$CONFIG_FILE"
+          #echo "CONFIG_BRIDGE_NETFILTER=y" >> "$CONFIG_FILE"
+          #echo "CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y" >> "$CONFIG_FILE"
+          #echo "CONFIG_NETFILTER_XT_MATCH_IPVS=y" >> "$CONFIG_FILE"
           
           echo "Docker support configuration added successfully"
 
