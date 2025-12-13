@@ -71,7 +71,7 @@ on:
         description: 'Enable Docker support in kernel?'
         required: true
         type: boolean
-        default: false
+        default: true
 
 jobs:
   get_manager:

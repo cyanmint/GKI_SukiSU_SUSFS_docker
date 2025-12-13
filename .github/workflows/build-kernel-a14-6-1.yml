@@ -45,6 +45,11 @@ on:
         required: true
         type: boolean
         default: true
+      docker_support:
+        description: 'Enable Docker support in kernel?'
+        required: true
+        type: boolean
+        default: true
 jobs:
 
   build-kernel-a14-6-1:
@@ -57,6 +62,7 @@ jobs:
       version: ${{ inputs.version }}
       use_zram: ${{ inputs.use_zram }}
       use_kpm: ${{ inputs.use_kpm }}
+      docker_support: ${{ inputs.docker_support }}
   get-ksu-manager:
     if: ${{ inputs.get_manager }}
     uses: ./.github/workflows/get-manager.yml
