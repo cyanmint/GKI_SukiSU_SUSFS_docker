@@ -163,7 +163,7 @@ jobs:
             susfs4ksu
             kernel_patches
             SukiSU_patch
-          key: dependencies-${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ github.sha }}
+          key: dependencies-${{ inputs.android_version }}-${{ inputs.kernel_version }}-v1
           restore-keys: |
             dependencies-${{ inputs.android_version }}-${{ inputs.kernel_version }}-
 
@@ -200,7 +200,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.CONFIG }}
-          key: kernel-source-${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.os_patch_level }}-${{ github.sha }}
+          key: kernel-source-${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.os_patch_level }}-v1
           restore-keys: |
             kernel-source-${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.os_patch_level }}-
 
@@ -211,7 +211,7 @@ jobs:
           cd "$CONFIG"
 
           # Skip sync if cache hit and source exists
-          if [ -d "./common" ] && [ "${{ steps.cache-kernel-source.outputs.cache-hit }}" == "true" ]; then
+          if [ -d "common" ] && [ "${{ steps.cache-kernel-source.outputs.cache-hit }}" == "true" ]; then
             echo "Using cached kernel source..."
           else
             # Initialize and sync kernel source
