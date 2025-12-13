@@ -42,6 +42,11 @@ on:
         required: true
         type: boolean
         default: false
+      selected_sub_level:
+        description: 'Build only a specific sub_level (leave empty for all)'
+        required: false
+        type: string
+        default: ''
   
 jobs:
   build-kernel-a13-5-10-kernelsu-susfs:

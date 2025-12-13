@@ -149,7 +149,21 @@ jobs:
           chmod a+rx ./git-repo/repo
           echo "REPO=$GITHUB_WORKSPACE/./git-repo/repo" >> $GITHUB_ENV
 
+      - name: 缓存依赖仓库
+        id: cache-dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            AnyKernel3
+            susfs4ksu
+            kernel_patches
+            SukiSU_patch
+          key: dependencies-${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ github.sha }}
+          restore-keys: |
+            dependencies-${{ inputs.android_version }}-${{ inputs.kernel_version }}-
+
       - name: 克隆 AnyKernel3 和其他依赖项
+        if: steps.cache-dependencies.outputs.cache-hit != 'true'
         run: |
           echo "Cloning AnyKernel3 and other dependencies..."
 
@@ -176,27 +190,41 @@ jobs:
 
           echo "CONFIG set to: $CONFIG"
 
+      - name: 缓存内核源代码
+        id: cache-kernel-source
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CONFIG }}
+          key: kernel-source-${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.os_patch_level }}-${{ github.sha }}
+          restore-keys: |
+            kernel-source-${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.os_patch_level }}-
+
       - name: 初始化和同步内核源代码
         run: |
           echo "Creating folder for configuration: $CONFIG..."
           mkdir -p "$CONFIG"
           cd "$CONFIG"
 
-          # Initialize and sync kernel source
-          echo "Initializing and syncing kernel source..."
-          FORMATTED_BRANCH="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.os_patch_level }}"
-          $REPO init --depth=1 --u https://android.googlesource.com/kernel/manifest -b common-${FORMATTED_BRANCH} --repo-rev=v2.16
-          REMOTE_BRANCH=$(git ls-remote https://android.googlesource.com/kernel/common ${FORMATTED_BRANCH})
-          DEFAULT_MANIFEST_PATH=.repo/manifests/default.xml
-          # Check if branch is deprecated
-          if grep -q deprecated <<< $REMOTE_BRANCH; then
-            echo "Found deprecated branch: $FORMATTED_BRANCH"
-            sed -i "s/\"${FORMATTED_BRANCH}\"/\"deprecated\/${FORMATTED_BRANCH}\"/g" $DEFAULT_MANIFEST_PATH
+          # Skip sync if cache hit and source exists
+          if [ -d "./common" ] && [ "${{ steps.cache-kernel-source.outputs.cache-hit }}" == "true" ]; then
+            echo "Using cached kernel source..."
+          else
+            # Initialize and sync kernel source
+            echo "Initializing and syncing kernel source..."
+            FORMATTED_BRANCH="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.os_patch_level }}"
+            $REPO init --depth=1 --u https://android.googlesource.com/kernel/manifest -b common-${FORMATTED_BRANCH} --repo-rev=v2.16
+            REMOTE_BRANCH=$(git ls-remote https://android.googlesource.com/kernel/common ${FORMATTED_BRANCH})
+            DEFAULT_MANIFEST_PATH=.repo/manifests/default.xml
+            # Check if branch is deprecated
+            if grep -q deprecated <<< $REMOTE_BRANCH; then
+              echo "Found deprecated branch: $FORMATTED_BRANCH"
+              sed -i "s/\"${FORMATTED_BRANCH}\"/\"deprecated\/${FORMATTED_BRANCH}\"/g" $DEFAULT_MANIFEST_PATH
+            fi
+            # Sync repo and apply patches
+            $REPO --version
+            $REPO --trace sync -c -j$(nproc --all) --no-tags --fail-fast
+            echo "REMOTE_BRANCH=$REMOTE_BRANCH" >> $GITHUB_ENV
           fi
-          # Sync repo and apply patches
-          $REPO --version
-          $REPO --trace sync -c -j$(nproc --all) --no-tags --fail-fast
-          echo "REMOTE_BRANCH=$REMOTE_BRANCH" >> $GITHUB_ENV
 
           FORMATTED_BRANCH="${{ inputs.android_version }}-${{ inputs.kernel_version }}"
           if grep -q deprecated <<< "$REMOTE_BRANCH" && \
