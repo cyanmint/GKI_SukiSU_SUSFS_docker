@@ -465,22 +465,38 @@ jobs:
             patch -p1 -F 3 < 69_hide_stuff.patch
           fi
 
-      - name: 应用cgroup设备修复补丁 (android14-6.1)
+      - name: 应用Docker支持补丁 (android14-6.1)
         if: ${{ inputs.android_version == 'android14' && inputs.kernel_version == '6.1' && inputs.docker_support }}
         run: |
-          echo "应用cgroup fix patch for android14-6.1..."
+          echo "应用Docker支持补丁 for android14-6.1..."
           cd "$CONFIG/common"
           
-          # Apply cgroup fix patch to prevent bootloop when CONFIG_CGROUP_DEVICE is enabled
-          PATCH_FILE="$GITHUB_WORKSPACE/patches/android14-6.1/cgroup_fix_cgroup_prefix.patch"
-          if [ -f "$PATCH_FILE" ]; then
-            cp "$PATCH_FILE" ./
-            patch -p1 < cgroup_fix_cgroup_prefix.patch
-            echo "cgroup fix patch applied successfully"
-          else
-            echo "Warning: Patch file not found at $PATCH_FILE"
-            exit 1
-          fi
+          # Apply all patches required for CONFIG_CGROUP_DEVICE and Docker support
+          PATCHES=(
+            "cgroup_fix_cgroup_prefix.patch"
+            "gki_use_Android_ABI_padding_for_SYSVIPC_task_struct_fields.patch"
+            "Ignore_symbols_crc_check.patch"
+            "overlayfs_dont_make_DCACHE_OP_HASH_and_DCACHE_OP_COMPARE_weird.patch"
+          )
+          
+          for patch_name in "${PATCHES[@]}"; do
+            PATCH_FILE="$GITHUB_WORKSPACE/patches/android14-6.1/$patch_name"
+            if [ -f "$PATCH_FILE" ]; then
+              echo "应用补丁: $patch_name"
+              cp "$PATCH_FILE" ./
+              if patch -p1 < "$patch_name"; then
+                echo "✓ $patch_name 应用成功"
+              else
+                echo "✗ $patch_name 应用失败"
+                exit 1
+              fi
+            else
+              echo "警告: 补丁文件未找到 $PATCH_FILE"
+              exit 1
+            fi
+          done
+          
+          echo "所有Docker支持补丁应用成功"
 
       - name: LZ4KD & Lz4k_oplus配置
         if: ${{ inputs.use_zram }}
