@@ -465,8 +465,10 @@ jobs:
             patch -p1 -F 3 < 69_hide_stuff.patch
           fi
 
-      - name: 应用Docker支持补丁 (android14-6.1)
-        if: ${{ inputs.android_version == 'android14' && inputs.kernel_version == '6.1' && inputs.docker_support }}
+      - name: 应用Docker支持补丁 (android14-6.1) - DISABLED
+        # Patches disabled due to bootloop issues on Android 14
+        # These patches were originally for Android 12 and are not compatible with Android 14
+        if: false
         run: |
           echo "应用Docker支持补丁 for android14-6.1..."
           cd "$CONFIG/common"
@@ -628,10 +630,10 @@ jobs:
           echo "CONFIG_USER_NS=y" >> "$CONFIG_FILE"
           echo "CONFIG_POSIX_MQUEUE=y" >> "$CONFIG_FILE"
           
-          # Enable CGROUP_DEVICE and SYSVIPC only for android14-6.1 (with patches applied)
+          # Enable SYSVIPC only for android14-6.1 (CGROUP_DEVICE disabled due to bootloop)
           if [ "${{ inputs.android_version }}" = "android14" ] && [ "${{ inputs.kernel_version }}" = "6.1" ]; then
             echo "CONFIG_SYSVIPC=y" >> "$CONFIG_FILE"
-            #echo "CONFIG_CGROUP_DEVICE=y" >> "$CONFIG_FILE"  
+            # CONFIG_CGROUP_DEVICE=y disabled - causes bootloop even with patches
           fi
           #echo "CONFIG_BRIDGE_NETFILTER=y" >> "$CONFIG_FILE"
           #echo "CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y" >> "$CONFIG_FILE"
