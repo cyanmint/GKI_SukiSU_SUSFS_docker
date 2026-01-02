@@ -12,10 +12,10 @@ on:
   workflow_dispatch:
     inputs:
       make_release:
-        description: 'Do you want to create a release?'
+        description: 'Do you want to upload to GitHub Releases? (If unchecked, artifacts will still be uploaded)'
         required: true
         type: boolean
-        default: true
+        default: false
       kernels_to_build:
         description: |
           Comma-separated list of kernels to build/release, e.g.:
@@ -306,9 +306,14 @@ jobs:
         id: release_check
         if: ${{ inputs.make_release && needs.check-build-status.outputs.should_release == 'true' }}
         run: echo "Release conditions met. Proceeding with release."
+      
+      - name: Artifact Processing Check
+        id: artifact_check
+        if: ${{ needs.check-build-status.outputs.should_release == 'true' }}
+        run: echo "Build succeeded. Will process artifacts."
         
       - name: Checkout code
-        if: ${{ steps.release_check.outcome == 'success' }}
+        if: ${{ steps.artifact_check.outcome == 'success' }}
         uses: actions/checkout@v4
         
       - name: Install GitHub CLI
@@ -555,13 +560,13 @@ jobs:
           echo "EOF" >> $GITHUB_ENV
           
       - name: Download Artifacts
-        if: ${{ steps.release_check.outcome == 'success' }}
+        if: ${{ steps.artifact_check.outcome == 'success' }}
         uses: actions/download-artifact@v4
         with:
           path: release-artifacts-${{ github.run_id }}
           
       - name: Prepare Artifacts for Upload
-        if: ${{ steps.release_check.outcome == 'success' }}
+        if: ${{ steps.artifact_check.outcome == 'success' }}
         run: |
           # Create a new directory for release assets
           mkdir -p release-assets
