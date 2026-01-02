@@ -53,6 +53,16 @@ on:
         required: true
         type: boolean
         default: false
+      docker_support:
+        description: 'Enable Docker support in kernel?'
+        required: true
+        type: boolean
+        default: true
+      selected_sub_level:
+        description: 'Build only a specific sub_level (leave empty for all)'
+        required: false
+        type: string
+        default: ''
 jobs:
   build-kernel-kernelsu-susfs:
     runs-on: ubuntu-latest
@@ -62,6 +72,9 @@ jobs:
       CCACHE_HARDLINK: "true"
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
       - name: Maximize Build Space
         uses: AdityaGarg8/remove-unwanted-software@v5
         with:
@@ -144,7 +157,21 @@ jobs:
           chmod a+rx ./git-repo/repo
           echo "REPO=$GITHUB_WORKSPACE/./git-repo/repo" >> $GITHUB_ENV
 
+      - name: 缓存依赖仓库
+        id: cache-dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            AnyKernel3
+            susfs4ksu
+            kernel_patches
+            SukiSU_patch
+          key: dependencies-${{ inputs.android_version }}-${{ inputs.kernel_version }}-v1
+          restore-keys: |
+            dependencies-${{ inputs.android_version }}-${{ inputs.kernel_version }}-
+
       - name: 克隆 AnyKernel3 和其他依赖项
+        if: steps.cache-dependencies.outputs.cache-hit != 'true'
         run: |
           echo "Cloning AnyKernel3 and other dependencies..."
 
@@ -171,27 +198,41 @@ jobs:
 
           echo "CONFIG set to: $CONFIG"
 
+      - name: 缓存内核源代码
+        id: cache-kernel-source
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CONFIG }}
+          key: kernel-source-${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.os_patch_level }}-v1
+          restore-keys: |
+            kernel-source-${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.os_patch_level }}-
+
       - name: 初始化和同步内核源代码
         run: |
           echo "Creating folder for configuration: $CONFIG..."
           mkdir -p "$CONFIG"
           cd "$CONFIG"
 
-          # Initialize and sync kernel source
-          echo "Initializing and syncing kernel source..."
-          FORMATTED_BRANCH="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.os_patch_level }}"
-          $REPO init --depth=1 --u https://android.googlesource.com/kernel/manifest -b common-${FORMATTED_BRANCH} --repo-rev=v2.16
-          REMOTE_BRANCH=$(git ls-remote https://android.googlesource.com/kernel/common ${FORMATTED_BRANCH})
-          DEFAULT_MANIFEST_PATH=.repo/manifests/default.xml
-          # Check if branch is deprecated
-          if grep -q deprecated <<< $REMOTE_BRANCH; then
-            echo "Found deprecated branch: $FORMATTED_BRANCH"
-            sed -i "s/\"${FORMATTED_BRANCH}\"/\"deprecated\/${FORMATTED_BRANCH}\"/g" $DEFAULT_MANIFEST_PATH
+          # Skip sync if cache hit and source exists
+          if [ -d "common" ] && [ "${{ steps.cache-kernel-source.outputs.cache-hit }}" == "true" ]; then
+            echo "Using cached kernel source..."
+          else
+            # Initialize and sync kernel source
+            echo "Initializing and syncing kernel source..."
+            FORMATTED_BRANCH="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.os_patch_level }}"
+            $REPO init --depth=1 --u https://android.googlesource.com/kernel/manifest -b common-${FORMATTED_BRANCH} --repo-rev=v2.16
+            REMOTE_BRANCH=$(git ls-remote https://android.googlesource.com/kernel/common ${FORMATTED_BRANCH})
+            DEFAULT_MANIFEST_PATH=.repo/manifests/default.xml
+            # Check if branch is deprecated
+            if grep -q deprecated <<< $REMOTE_BRANCH; then
+              echo "Found deprecated branch: $FORMATTED_BRANCH"
+              sed -i "s/\"${FORMATTED_BRANCH}\"/\"deprecated\/${FORMATTED_BRANCH}\"/g" $DEFAULT_MANIFEST_PATH
+            fi
+            # Sync repo and apply patches
+            $REPO --version
+            $REPO --trace sync -c -j$(nproc --all) --no-tags --fail-fast
+            echo "REMOTE_BRANCH=$REMOTE_BRANCH" >> $GITHUB_ENV
           fi
-          # Sync repo and apply patches
-          $REPO --version
-          $REPO --trace sync -c -j$(nproc --all) --no-tags --fail-fast
-          echo "REMOTE_BRANCH=$REMOTE_BRANCH" >> $GITHUB_ENV
 
           FORMATTED_BRANCH="${{ inputs.android_version }}-${{ inputs.kernel_version }}"
           if grep -q deprecated <<< "$REMOTE_BRANCH" && \
@@ -418,11 +459,44 @@ jobs:
           # Apply additional patch
           if [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then
           cp ../../SukiSU_patch/69_hide_stuff.patch ./
-          patch -p1 -F 3 < 69_hide_stuff.patch
+          patch -p1 -F 3 < 69_hide_stuff.patch || true
           else
             cp ../../kernel_patches/69_hide_stuff.patch ./
             patch -p1 -F 3 < 69_hide_stuff.patch
           fi
+
+      - name: 应用Docker支持补丁 (android14-6.1)
+        if: ${{ inputs.android_version == 'android14' && inputs.kernel_version == '6.1' && inputs.docker_support }}
+        run: |
+          echo "应用Docker支持补丁 for android14-6.1..."
+          cd "$CONFIG/common"
+          
+          # Apply all patches required for CONFIG_CGROUP_DEVICE and Docker support
+          PATCHES=(
+            "cgroup_fix_cgroup_prefix.patch"
+            "gki_use_Android_ABI_padding_for_SYSVIPC_task_struct_fields.patch"
+            "Ignore_symbols_crc_check.patch"
+            "overlayfs_dont_make_DCACHE_OP_HASH_and_DCACHE_OP_COMPARE_weird.patch"
+          )
+          
+          for patch_name in "${PATCHES[@]}"; do
+            PATCH_FILE="$GITHUB_WORKSPACE/patches/android14-6.1/$patch_name"
+            if [ -f "$PATCH_FILE" ]; then
+              echo "应用补丁: $patch_name"
+              cp "$PATCH_FILE" ./
+              if patch -p1 < "$patch_name"; then
+                echo "✓ $patch_name 应用成功"
+              else
+                echo "✗ $patch_name 应用失败"
+                exit 1
+              fi
+            else
+              echo "警告: 补丁文件未找到 $PATCH_FILE"
+              exit 1
+            fi
+          done
+          
+          echo "所有Docker支持补丁应用成功"
 
       - name: LZ4KD & Lz4k_oplus配置
         if: ${{ inputs.use_zram }}
@@ -539,6 +613,33 @@ jobs:
           # Remove check_defconfig
           sed -i 's/check_defconfig//' ./common/build.config.gki
 
+      - name: 添加 Docker 支持配置
+        if: ${{ inputs.docker_support }}
+        run: |
+          echo "更改为配置目录: $CONFIG..."
+          cd "$CONFIG"
+          echo "Adding Docker support configuration settings to gki_defconfig..."
+          
+          CONFIG_FILE="./common/arch/arm64/configs/gki_defconfig"
+          
+          # Add Docker required configurations
+          echo "CONFIG_PID_NS=y" >> "$CONFIG_FILE"
+          echo "CONFIG_IPC_NS=y" >> "$CONFIG_FILE"
+          echo "CONFIG_USER_NS=y" >> "$CONFIG_FILE"
+          echo "CONFIG_POSIX_MQUEUE=y" >> "$CONFIG_FILE"
+          
+          # Enable CGROUP_DEVICE and SYSVIPC only for android14-6.1 (with patches applied)
+          if [ "${{ inputs.android_version }}" = "android14" ] && [ "${{ inputs.kernel_version }}" = "6.1" ]; then
+            echo "CONFIG_SYSVIPC=y" >> "$CONFIG_FILE"
+            echo "CONFIG_CGROUP_DEVICE=y" >> "$CONFIG_FILE"
+          fi
+          
+          #echo "CONFIG_BRIDGE_NETFILTER=y" >> "$CONFIG_FILE"
+          #echo "CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y" >> "$CONFIG_FILE"
+          #echo "CONFIG_NETFILTER_XT_MATCH_IPVS=y" >> "$CONFIG_FILE"
+          
+          echo "Docker support configuration added successfully"
+
       - name: 配置内核名称
         run: |
           echo "更改为配置目录: $CONFIG..."
@@ -575,6 +676,37 @@ jobs:
             if [ ! -z ${{ inputs.version }} ]; then
               sed -i '/^CONFIG_LOCALVERSION=/ s/="\([^"]*\)"/="${{ inputs.version }}"/' ./common/arch/arm64/configs/gki_defconfig
             fi
+          fi
+
+      - name: 修复符号链接循环 (Fix symlink loops)
+        run: |
+          echo "检查并修复符号链接循环..."
+          cd "$CONFIG"
+          
+          # Find and remove circular symlinks in KernelSU directory
+          if [ -d "common/drivers/kernelsu" ]; then
+            echo "检查 KernelSU 目录中的符号链接..."
+            
+            # Remove the problematic kernel subdirectory if it exists and has symlinks
+            if [ -d "common/drivers/kernelsu/kernel" ]; then
+              echo "发现 kernelsu/kernel 目录，检查是否有循环引用..."
+              # Check if kernel directory contains itself as a subdirectory (symlink loop indicator)
+              if [ -d "common/drivers/kernelsu/kernel/kernel" ] || [ -L "common/drivers/kernelsu/kernel/kernel" ]; then
+                echo "检测到循环引用，移除整个 kernel 子目录..."
+                rm -rf common/drivers/kernelsu/kernel
+                echo "已移除 kernelsu/kernel 目录"
+              fi
+            fi
+            
+            # Also clean up any remaining circular symlinks
+            find common/drivers/kernelsu -type l 2>/dev/null | while read link; do
+              if ! readlink -e "$link" >/dev/null 2>&1; then
+                echo "移除无效符号链接: $link"
+                rm -f "$link"
+              fi
+            done
+            
+            echo "符号链接清理完成"
           fi
 
       - name: Build with retry

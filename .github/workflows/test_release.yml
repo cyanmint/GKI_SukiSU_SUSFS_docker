@@ -21,9 +21,18 @@ on:
           Comma-separated list of kernels to build/release, e.g.:
           a12-5.10,a13-5.10,a13-5.15,a14-5.15,a14-6.1,a15-6.6
           or "all" to build every kernel.
+          You can also specify a sub_level: a14-6.1.124 (builds only that version)
         required: true
         type: string
-        default: 'all'
+        default: 'a14-6.1.124'
+      selected_sub_level:
+        description: |
+          (Optional) Build only a specific sub_level version for the selected kernel.
+          Format: kernel sub_level (e.g., "124" for a14-6.1.124)
+          Leave empty to build all configured versions for the selected kernel(s).
+        required: false
+        type: string
+        default: '124'
       kernelsu_variant:
         description: "Select KernelSU"
         required: true
@@ -42,7 +51,7 @@ on:
         - Stable(标准)
         - Dev(开发)
         - Other(其他/指定)
-        default: Stable(标准)
+        default: Dev(开发)
       version:
         description: 'Custom version name (e.g., characters after 5.10.198 / leave blank to use default version number)'
         required: false
@@ -67,6 +76,11 @@ on:
         required: true
         type: boolean
         default: false
+      docker_support:
+        description: 'Enable Docker support in kernel?'
+        required: true
+        type: boolean
+        default: true
 
 jobs:
   get_manager:
@@ -88,6 +102,8 @@ jobs:
       use_zram: ${{ inputs.use_zram }}
       use_kpm: ${{ inputs.use_kpm }}
       BBG: ${{ inputs.BBG }}
+      docker_support: ${{ inputs.docker_support }}
+      selected_sub_level: ${{ inputs.selected_sub_level }}
 
   build-kernel-a13-5-10:
     if: contains(github.event.inputs.kernels_to_build, 'all') || contains(github.event.inputs.kernels_to_build, 'a13-5.10')
@@ -101,6 +117,8 @@ jobs:
       use_zram: ${{ inputs.use_zram }}
       use_kpm: ${{ inputs.use_kpm }}
       BBG: ${{ inputs.BBG }}
+      docker_support: ${{ inputs.docker_support }}
+      selected_sub_level: ${{ inputs.selected_sub_level }}
 
   build-kernel-a13-5-15:
     if: contains(github.event.inputs.kernels_to_build, 'all') || contains(github.event.inputs.kernels_to_build, 'a13-5.15')
@@ -114,6 +132,8 @@ jobs:
       use_zram: ${{ inputs.use_zram }}
       use_kpm: ${{ inputs.use_kpm }}
       BBG: ${{ inputs.BBG }}
+      docker_support: ${{ inputs.docker_support }}
+      selected_sub_level: ${{ inputs.selected_sub_level }}
 
   build-kernel-a14-5-15:
     if: contains(github.event.inputs.kernels_to_build, 'all') || contains(github.event.inputs.kernels_to_build, 'a14-5.15')
@@ -127,6 +147,8 @@ jobs:
       use_zram: ${{ inputs.use_zram }}
       use_kpm: ${{ inputs.use_kpm }}
       BBG: ${{ inputs.BBG }}
+      docker_support: ${{ inputs.docker_support }}
+      selected_sub_level: ${{ inputs.selected_sub_level }}
 
   build-kernel-a14-6-1:
     if: contains(github.event.inputs.kernels_to_build, 'all') || contains(github.event.inputs.kernels_to_build, 'a14-6.1')
@@ -140,6 +162,8 @@ jobs:
       use_zram: ${{ inputs.use_zram }}
       use_kpm: ${{ inputs.use_kpm }}
       BBG: ${{ inputs.BBG }}
+      docker_support: ${{ inputs.docker_support }}
+      selected_sub_level: ${{ inputs.selected_sub_level }}
 
   build-kernel-a15-6-6:
     if: contains(github.event.inputs.kernels_to_build, 'all') || contains(github.event.inputs.kernels_to_build, 'a15-6.6')
@@ -153,6 +177,8 @@ jobs:
       use_zram: ${{ inputs.use_zram }}
       use_kpm: ${{ inputs.use_kpm }}
       BBG: ${{ inputs.BBG }}
+      docker_support: ${{ inputs.docker_support }}
+      selected_sub_level: ${{ inputs.selected_sub_level }}
 
   check-build-status:
     runs-on: ubuntu-latest
